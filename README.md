@@ -1,1 +1,0 @@
-# Ever-Gemini-Model-Ever

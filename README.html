@@ -1,0 +1,632 @@
+# Ever-Gemini-Model-Ever
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to Google Gemini AI Models</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The application is structured as an interactive dashboard rather than a linear report. The core is a 'Model Explorer' with dynamic filtering, allowing users to find models based on use cases or features. This is supplemented by a practical 'Cost & Token Calculator' and a 'Comparative Analysis' chart. This task-oriented design is chosen because users (developers, strategists) likely have specific questions (e.g., 'which model is best for X?', 'what would Y cost?'). This structure provides direct answers and facilitates decision-making more effectively than a static document. -->
+    <!-- Visualization & Content Choices: 
+        - Model Hierarchy/Features: Presented as filterable cards instead of a static table for interactive exploration. (Vanilla JS, Tailwind)
+        - Token/Pricing Data: Transformed into a 'Cost & Token Calculator' to provide tangible, personalized estimates, making the data more useful. (Vanilla JS)
+        - Model Comparison: A dynamic Chart.js bar chart allows visual comparison of models across different metrics (price, context window), which is faster to interpret than raw numbers. (Chart.js, Vanilla JS)
+        - Advanced Feature Explanations: Organized into a clean, tabbed interface to prevent information overload and allow focused reading. (Vanilla JS, Tailwind)
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            background-color: #F8F7F4;
+            color: #333;
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 400px;
+            max-height: 50vh;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 500px;
+            }
+        }
+        .tab-active {
+            background-color: #4A5568;
+            color: #FFFFFF;
+        }
+        .tab-inactive {
+            background-color: #E2E8F0;
+            color: #4A5568;
+        }
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            background-color: #FFFFFF;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 48rem;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        .modal-backdrop.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-backdrop.active .modal-content {
+            transform: scale(1);
+        }
+    </style>
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="antialiased">
+
+    <header class="bg-white shadow-sm py-6">
+        <div class="container mx-auto px-6 text-center">
+            <h1 class="text-4xl font-bold text-gray-800">Interactive Guide to Google's Gemini AI Models</h1>
+            <p class="mt-2 text-lg text-gray-600">Explore, compare, and calculate costs for the entire Gemini family.</p>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-6 py-12">
+        
+        <section id="model-explorer" class="mb-16">
+            <h2 class="text-3xl font-bold text-center mb-2 text-gray-800">Model Explorer</h2>
+            <p class="text-center text-gray-600 mb-8">Filter the models by use case, features, or status to find the right fit for your project.</p>
+
+            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <h3 class="font-semibold mb-2 text-gray-700">Filter by Use Case</h3>
+                        <div id="use-case-filters" class="space-y-2"></div>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-2 text-gray-700">Filter by Feature</h3>
+                        <div id="feature-filters" class="space-y-2"></div>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-2 text-gray-700">Filter by Status</h3>
+                        <div id="status-filters" class="space-y-2"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="model-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            </div>
+        </section>
+
+        <section id="cost-calculator" class="mb-16 bg-white p-8 rounded-lg shadow-md">
+            <h2 class="text-3xl font-bold text-center mb-2 text-gray-800">Cost & Token Calculator</h2>
+             <p class="text-center text-gray-600 mb-8">Estimate token consumption and potential costs for your workload. Prices are illustrative, per 1 million tokens.</p>
+            <form id="calculator-form" class="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+                <div>
+                    <label for="calc-model" class="block font-medium text-gray-700 mb-2">Select Model</label>
+                    <select id="calc-model" class="w-full p-2 border rounded-md bg-gray-50"></select>
+
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label for="calc-text" class="block font-medium text-gray-700 mb-1">Text (characters)</label>
+                            <input type="number" id="calc-text" placeholder="e.g., 10000" class="w-full p-2 border rounded-md bg-gray-50">
+                        </div>
+                         <div>
+                            <label for="calc-images" class="block font-medium text-gray-700 mb-1">Images (count)</label>
+                            <input type="number" id="calc-images" placeholder="e.g., 5" class="w-full p-2 border rounded-md bg-gray-50">
+                        </div>
+                        <div>
+                            <label for="calc-video" class="block font-medium text-gray-700 mb-1">Video (seconds)</label>
+                            <input type="number" id="calc-video" placeholder="e.g., 60" class="w-full p-2 border rounded-md bg-gray-50">
+                        </div>
+                         <div>
+                            <label for="calc-audio" class="block font-medium text-gray-700 mb-1">Audio (seconds)</label>
+                            <input type="number" id="calc-audio" placeholder="e.g., 300" class="w-full p-2 border rounded-md bg-gray-50">
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-100 p-6 rounded-lg">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-800">Estimated Consumption & Cost</h3>
+                    <div id="calculator-results" class="space-y-3">
+                        <p>Enter values and select a model to see estimates.</p>
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <section id="comparison-tool" class="mb-16">
+            <h2 class="text-3xl font-bold text-center mb-2 text-gray-800">Comparative Analysis</h2>
+            <p class="text-center text-gray-600 mb-8">Visually compare models across key metrics. Select a metric to update the chart.</p>
+            <div class="bg-white p-8 rounded-lg shadow-md">
+                 <div class="max-w-xs mx-auto mb-6">
+                    <label for="comparison-metric" class="block font-medium text-gray-700 mb-2">Comparison Metric:</label>
+                    <select id="comparison-metric" class="w-full p-2 border rounded-md bg-gray-50"></select>
+                </div>
+                <div class="chart-container">
+                    <canvas id="comparison-chart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section id="advanced-features">
+             <h2 class="text-3xl font-bold text-center mb-2 text-gray-800">Advanced Features Spotlight</h2>
+             <p class="text-center text-gray-600 mb-8">Dive deeper into the key technologies that power the Gemini family.</p>
+            <div class="bg-white p-8 rounded-lg shadow-md">
+                <div id="feature-tabs" class="flex border-b mb-6"></div>
+                <div id="feature-content"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="mt-16 py-8 bg-gray-800 text-white">
+        <div class="container mx-auto px-6 text-center">
+            <p>Interactive Visualization by AI. Data sourced from the "Google Gemini AI Model Family" report.</p>
+        </div>
+    </footer>
+
+    <div id="model-modal" class="modal-backdrop">
+        <div id="modal-content-container" class="modal-content">
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            const modelData = [
+                {
+                    id: 'gemini-2.5-pro',
+                    name: 'Gemini 2.5 Pro',
+                    useCase: 'Advanced Reasoning & Complex Tasks',
+                    tags: ['Advanced Reasoning', 'Complex Problem-Solving', 'Advanced Coding', 'Scientific Research', 'Creative Multimedia'],
+                    description: "Google's most advanced reasoning model, excelling in complex problem-solving, advanced coding, and demanding scientific and mathematical benchmarks. Ideal for tasks requiring deep analytical capabilities.",
+                    contextWindow: 1000000,
+                    status: 'Generally Available',
+                    features: ['Multimodal', 'Advanced Reasoning', 'Advanced Coding', 'Thinking Capabilities', 'Live API', 'Grounding with Google Search', 'Function Calling', 'Context Caching', 'Tuning', 'Structured Output', 'Vertex AI RAG Engine', 'Chat Completions'],
+                    pricing: { input: 2.50, output: 15.00 }
+                },
+                {
+                    id: 'gemini-2.5-flash',
+                    name: 'Gemini 2.5 Flash',
+                    useCase: 'High Throughput & Price-Performance',
+                    tags: ['High Throughput', 'Price-Performance', 'Repetitive Tasks'],
+                    description: "Distinguished by its optimal price-performance balance and high speed, making it well-suited for diverse and repetitive tasks that demand high throughput.",
+                    contextWindow: 1000000,
+                    status: 'Generally Available',
+                    features: ['Multimodal', 'Thinking Process Visibility', 'Live API', 'Grounding with Google Search', 'Function Calling', 'Context Caching', 'Tuning', 'Structured Output', 'Vertex AI RAG Engine', 'Chat Completions'],
+                    pricing: { input: 1.25, output: 2.50 }
+                },
+                {
+                    id: 'gemini-2.5-flash-lite',
+                    name: 'Gemini 2.5 Flash-Lite',
+                    useCase: 'Most Cost-Effective & Low-Latency',
+                    tags: ['Cost-Effective', 'Low-Latency'],
+                    description: "The most cost-effective model, specifically designed for high throughput and low-latency use cases where cost-efficiency and rapid response times are paramount.",
+                    contextWindow: 1000000,
+                    status: 'Preview',
+                    features: ['Multimodal', 'Grounding with Google Search', 'Code Execution', 'System Instructions', 'Function Calling', 'Thinking', 'Context Caching', 'Vertex AI RAG Engine', 'Chat Completions'],
+                    pricing: { input: 0.63, output: 1.25 }
+                },
+                {
+                    id: 'gemini-2.0-flash',
+                    name: 'Gemini 2.0 Flash',
+                    useCase: 'Next-Gen Multimodal Agent',
+                    tags: ['Agentic', 'Integrated Tool Use'],
+                    description: "A multimodal model offering improved capabilities for the 'agentic era', with enhanced speed and integrated tool use, including grounding with Google Search and code execution.",
+                    contextWindow: 1000000,
+                    status: 'Generally Available',
+                    features: ['Multimodal', 'Grounding with Google Search', 'Code Execution', 'Tuning', 'System Instructions', 'Structured Output', 'Batch Prediction', 'Function Calling', 'Count Tokens', 'Context Caching', 'Vertex AI RAG Engine', 'Chat Completions', 'Image Generation', 'Live API'],
+                    pricing: { input: 0.50, output: 1.50 }
+                },
+                 {
+                    id: 'gemini-2.0-flash-lite',
+                    name: 'Gemini 2.0 Flash-Lite',
+                    useCase: 'Cost-Efficient Upgrade from 1.5',
+                    tags: ['Cost-Effective', 'Low-Latency'],
+                    description: "Optimized for cost efficiency and low latency, serving as an upgrade path for users seeking improved quality at a similar price and speed point as Gemini 1.5 Flash.",
+                    contextWindow: 1000000,
+                    status: 'Generally Available',
+                    features: ['Multimodal', 'Tuning', 'System Instructions', 'Structured Output', 'Batch Prediction', 'Function Calling', 'Count Tokens', 'Context Caching', 'Chat Completions'],
+                    pricing: { input: 0.25, output: 0.75 }
+                },
+                {
+                    id: 'gemini-1.5-pro',
+                    name: 'Gemini 1.5 Pro',
+                    useCase: 'Advanced NLP & Multimodal',
+                    tags: ['Advanced NLP', 'Multimodal Interaction'],
+                    description: "A significant advancement over the 1.0 series, with a Mixture-of-Experts (MoE) approach. It offers advanced NLP and robust multimodal interaction.",
+                    contextWindow: 1000000,
+                    status: 'Legacy Support',
+                    features: ['Multimodal', 'Advanced NLP', 'Multimodal Interaction', 'Image Generation', 'Mixture-of-Experts (MoE)'],
+                    pricing: { input: 3.50, output: 10.50 }
+                },
+                {
+                    id: 'gemini-1.5-flash',
+                    name: 'Gemini 1.5 Flash',
+                    useCase: 'Real-time & Low Latency',
+                    tags: ['Real-time', 'Low-Latency'],
+                    description: "Introduced real-time capabilities, enhancing dynamic interaction and focusing on processing live data with minimal latency.",
+                    contextWindow: 1000000,
+                    status: 'Legacy Support',
+                    features: ['Multimodal', 'Real-time Interaction'],
+                    pricing: { input: 0.35, output: 1.05 }
+                },
+                 {
+                    id: 'gemini-1.0-pro',
+                    name: 'Gemini 1.0 Pro',
+                    useCase: 'Versatile Creative & Q&A',
+                    tags: ['Creative Text', 'Translation', 'Q&A'],
+                    description: "A versatile model that powers Google's Bard assistant, suitable for creative text generation, language translation, and informative question-answering.",
+                    contextWindow: 32000,
+                    status: 'Generally Available',
+                    features: ['Multimodal', 'Creative Text Generation', 'Language Translation', 'Informative Q&A'],
+                    pricing: { input: 0.50, output: 1.50 }
+                },
+                {
+                    id: 'gemini-1.0-nano',
+                    name: 'Gemini 1.0 Nano',
+                    useCase: 'On-Device & High Efficiency',
+                    tags: ['On-Device', 'Low-Memory', 'Local Processing'],
+                    description: "A lightweight and efficient version engineered to run directly on mobile devices. Ideal for on-device tasks and local processing of sensitive data.",
+                    contextWindow: 4096,
+                    status: 'Generally Available',
+                    features: ['On-device', 'Resource Optimization'],
+                    pricing: { input: 0, output: 0 }
+                }
+            ];
+
+            const advancedFeaturesData = {
+                'Deep Research & Canvas': {
+                    title: 'Deep Research & Canvas',
+                    content: "Transforms a user's prompt into a multi-point research plan, autonomously searching the web to gather up-to-date information. It then reasons over this data iteratively to provide comprehensive custom research reports. Canvas allows users to upload their own files to guide the research. This represents a significant step towards more 'agentic AI' capable of sophisticated thinking and execution."
+                },
+                'Live API': {
+                    title: 'Live API',
+                    content: "Offers enhanced voice quality with numerous HD voices and languages. It includes 'Proactive Audio,' where the model responds only when relevant, and 'Affective Dialog,' allowing it to understand and respond to emotional expressions, facilitating highly natural conversational AI agents."
+                },
+                'Grounding with Google Search': {
+                    title: 'Grounding with Google Search',
+                    content: "Enables the model to retrieve and incorporate real-time information from the web into its responses. This significantly enhances accuracy and relevance by providing up-to-date context that the model's training data might lack."
+                },
+                'Thinking Process Visibility': {
+                    title: 'Thinking Process Visibility',
+                    content: "A preview feature that allows users to observe the model's internal reasoning process as it generates responses. This transparency is invaluable for debugging, understanding model behavior, and building more trustworthy AI systems."
+                },
+                 'Function Calling': {
+                    title: 'Function Calling',
+                    content: "This capability allows Gemini models to interact with external tools and APIs. It expands their utility beyond text generation, enabling them to perform actions or retrieve specific data from external systems, making them powerful components in larger applications."
+                },
+            };
+
+            const allUseCases = [...new Set(modelData.flatMap(m => m.tags))];
+            const allFeatures = [...new Set(modelData.flatMap(m => m.features))].filter(f => ['Live API', 'Grounding with Google Search', 'Function Calling', 'Deep Research', 'Code Execution', 'Tuning'].includes(f));
+            const allStatuses = [...new Set(modelData.map(m => m.status))];
+
+            const useCaseFiltersContainer = document.getElementById('use-case-filters');
+            const featureFiltersContainer = document.getElementById('feature-filters');
+            const statusFiltersContainer = document.getElementById('status-filters');
+            const cardsContainer = document.getElementById('model-cards-container');
+            
+            function populateFilters(container, items, type) {
+                items.forEach(item => {
+                    const label = document.createElement('label');
+                    label.className = 'flex items-center space-x-2 text-gray-600 cursor-pointer';
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'form-checkbox rounded text-indigo-600 h-4 w-4';
+                    checkbox.dataset.filterType = type;
+                    checkbox.dataset.filterValue = item;
+                    label.appendChild(checkbox);
+                    label.append(item);
+                    container.appendChild(label);
+                });
+            }
+
+            populateFilters(useCaseFiltersContainer, allUseCases, 'tag');
+            populateFilters(featureFiltersContainer, allFeatures, 'feature');
+            populateFilters(statusFiltersContainer, allStatuses, 'status');
+
+            function createModelCard(model) {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-lg shadow-lg overflow-hidden transform hover:-translate-y-1 transition-transform duration-300 model-card';
+                card.dataset.id = model.id;
+                card.dataset.tags = model.tags.join(',');
+                card.dataset.features = model.features.join(',');
+                card.dataset.status = model.status;
+                
+                card.innerHTML = `
+                    <div class="p-6">
+                        <div class="flex justify-between items-start">
+                             <h3 class="text-xl font-bold text-gray-800">${model.name}</h3>
+                            <span class="text-xs font-semibold px-2 py-1 rounded-full ${model.status === 'Generally Available' ? 'bg-green-100 text-green-800' : model.status === 'Preview' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}">${model.status}</span>
+                        </div>
+                        <p class="text-gray-600 mt-1">${model.useCase}</p>
+                        <div class="mt-4 flex justify-between text-sm text-gray-500">
+                            <span>Context Window:</span>
+                            <span class="font-semibold text-gray-700">${(model.contextWindow / 1000)}K tokens</span>
+                        </div>
+                        <button data-model-id="${model.id}" class="details-btn mt-6 w-full bg-indigo-600 text-white py-2 rounded-md font-semibold hover:bg-indigo-700 transition-colors">View Details</button>
+                    </div>
+                `;
+                return card;
+            }
+
+            modelData.forEach(model => {
+                cardsContainer.appendChild(createModelCard(model));
+            });
+
+            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('change', filterModels);
+            });
+
+            function filterModels() {
+                const activeFilters = {
+                    tag: [],
+                    feature: [],
+                    status: []
+                };
+
+                document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                    activeFilters[cb.dataset.filterType].push(cb.dataset.filterValue);
+                });
+
+                document.querySelectorAll('.model-card').forEach(card => {
+                    const cardTags = card.dataset.tags.split(',');
+                    const cardFeatures = card.dataset.features.split(',');
+                    const cardStatus = card.dataset.status;
+
+                    const tagMatch = activeFilters.tag.length === 0 || activeFilters.tag.some(f => cardTags.includes(f));
+                    const featureMatch = activeFilters.feature.length === 0 || activeFilters.feature.every(f => cardFeatures.includes(f));
+                    const statusMatch = activeFilters.status.length === 0 || activeFilters.status.includes(cardStatus);
+
+                    if (tagMatch && featureMatch && statusMatch) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            }
+
+            const calculatorForm = document.getElementById('calculator-form');
+            const calcModelSelect = document.getElementById('calc-model');
+            const resultsDiv = document.getElementById('calculator-results');
+            
+            modelData.filter(m => m.pricing.input > 0).forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.id;
+                option.textContent = model.name;
+                calcModelSelect.appendChild(option);
+            });
+
+            calculatorForm.addEventListener('input', updateCalculator);
+            
+            function updateCalculator() {
+                const selectedModelId = calcModelSelect.value;
+                const model = modelData.find(m => m.id === selectedModelId);
+                if (!model) return;
+
+                const textChars = parseInt(document.getElementById('calc-text').value) || 0;
+                const imageCount = parseInt(document.getElementById('calc-images').value) || 0;
+                const videoSecs = parseInt(document.getElementById('calc-video').value) || 0;
+                const audioSecs = parseInt(document.getElementById('calc-audio').value) || 0;
+                
+                const textTokens = Math.ceil(textChars / 4);
+                const imageTokens = imageCount * 258;
+                const videoTokens = videoSecs * 263;
+                const audioTokens = audioSecs * 32;
+
+                const totalInputTokens = textTokens + imageTokens + videoTokens + audioTokens;
+                const totalOutputTokens = Math.ceil(totalInputTokens * 0.25); // Assuming output is 25% of input for estimation
+
+                const inputCost = (totalInputTokens / 1000000) * model.pricing.input;
+                const outputCost = (totalOutputTokens / 1000000) * model.pricing.output;
+                const totalCost = inputCost + outputCost;
+
+                resultsDiv.innerHTML = `
+                    <div class="flex justify-between"><span>Input Tokens:</span> <span class="font-semibold">${totalInputTokens.toLocaleString()}</span></div>
+                    <div class="flex justify-between"><span>Estimated Output Tokens:</span> <span class="font-semibold">${totalOutputTokens.toLocaleString()}</span></div>
+                    <hr class="my-2 border-gray-300">
+                    <div class="flex justify-between"><span>Input Cost:</span> <span class="font-semibold">$${inputCost.toFixed(4)}</span></div>
+                    <div class="flex justify-between"><span>Output Cost:</span> <span class="font-semibold">$${outputCost.toFixed(4)}</span></div>
+                    <div class="flex justify-between mt-2 pt-2 border-t-2 border-gray-400 text-lg"><strong>Total Est. Cost:</strong> <strong class="text-indigo-600">$${totalCost.toFixed(4)}</strong></div>
+                `;
+            }
+
+            let comparisonChart;
+            const comparisonMetricSelect = document.getElementById('comparison-metric');
+            const comparisonMetrics = {
+                contextWindow: 'Context Window (Tokens)',
+                inputPrice: 'Input Price ($ per 1M tokens)',
+                outputPrice: 'Output Price ($ per 1M tokens)'
+            };
+            
+            for (const key in comparisonMetrics) {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = comparisonMetrics[key];
+                comparisonMetricSelect.appendChild(option);
+            }
+            
+            comparisonMetricSelect.addEventListener('change', () => updateComparisonChart(comparisonMetricSelect.value));
+            
+            function updateComparisonChart(metric) {
+                const chartData = modelData
+                    .filter(m => metric !== 'inputPrice' && metric !== 'outputPrice' || m.pricing.input > 0)
+                    .map(model => ({
+                        label: model.name,
+                        value: metric === 'contextWindow' ? model.contextWindow : model.pricing[metric.replace('Price', '')]
+                    }))
+                    .sort((a, b) => b.value - a.value);
+
+                const data = {
+                    labels: chartData.map(d => d.label),
+                    datasets: [{
+                        label: comparisonMetrics[metric],
+                        data: chartData.map(d => d.value),
+                        backgroundColor: 'rgba(79, 70, 229, 0.8)',
+                        borderColor: 'rgba(79, 70, 229, 1)',
+                        borderWidth: 1
+                    }]
+                };
+
+                if (comparisonChart) {
+                    comparisonChart.data = data;
+                    comparisonChart.options.scales.x.type = metric === 'contextWindow' ? 'logarithmic' : 'linear';
+                    comparisonChart.update();
+                } else {
+                    const ctx = document.getElementById('comparison-chart').getContext('2d');
+                    comparisonChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: data,
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    ticks: {
+                                        font: {
+                                            size: 10
+                                        }
+                                    }
+                                },
+                                x: {
+                                    beginAtZero: true,
+                                    type: 'logarithmic'
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            let label = context.dataset.label || '';
+                                            if (label) {
+                                                label += ': ';
+                                            }
+                                            if (context.parsed.x !== null) {
+                                                label += context.parsed.x.toLocaleString();
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            const featureTabsContainer = document.getElementById('feature-tabs');
+            const featureContentContainer = document.getElementById('feature-content');
+
+            Object.keys(advancedFeaturesData).forEach((key, index) => {
+                const tab = document.createElement('button');
+                tab.className = `px-4 py-2 font-semibold rounded-t-lg -mb-px border-t border-l border-r border-transparent ${index === 0 ? 'tab-active' : 'tab-inactive'}`;
+                tab.textContent = advancedFeaturesData[key].title;
+                tab.dataset.target = key;
+                featureTabsContainer.appendChild(tab);
+            });
+
+            function updateFeatureContent(key) {
+                 featureContentContainer.innerHTML = `<p class="text-gray-700 leading-relaxed">${advancedFeaturesData[key].content}</p>`;
+            }
+
+            featureTabsContainer.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    const targetKey = e.target.dataset.target;
+                    featureTabsContainer.querySelectorAll('button').forEach(btn => {
+                        btn.classList.remove('tab-active');
+                        btn.classList.add('tab-inactive');
+                    });
+                    e.target.classList.add('tab-active');
+                    e.target.classList.remove('tab-inactive');
+                    updateFeatureContent(targetKey);
+                }
+            });
+
+            const modal = document.getElementById('model-modal');
+            const modalContentContainer = document.getElementById('modal-content-container');
+
+            cardsContainer.addEventListener('click', (e) => {
+                const button = e.target.closest('.details-btn');
+                if (button) {
+                    const modelId = button.dataset.modelId;
+                    const model = modelData.find(m => m.id === modelId);
+                    showModal(model);
+                }
+            });
+
+            function showModal(model) {
+                modalContentContainer.innerHTML = `
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold text-gray-800">${model.name}</h2>
+                         <button id="close-modal" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+                    </div>
+                    <p class="text-gray-600 mb-6">${model.description}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 class="font-semibold text-gray-700 mb-2">Key Features</h4>
+                            <ul class="list-disc list-inside space-y-1 text-gray-600">
+                                ${model.features.map(f => `<li>${f}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="font-semibold text-gray-700 mb-2">Pricing (per 1M tokens)</h4>
+                                <div class="bg-gray-100 p-3 rounded-md text-sm">
+                                    <p class="flex justify-between"><span>Input:</span> <strong>$${model.pricing.input.toFixed(2)}</strong></p>
+                                    <p class="flex justify-between"><span>Output:</span> <strong>$${model.pricing.output.toFixed(2)}</strong></p>
+                                </div>
+                            </div>
+                             <div>
+                                <h4 class="font-semibold text-gray-700 mb-2">Quick Stats</h4>
+                                <div class="bg-gray-100 p-3 rounded-md text-sm">
+                                    <p class="flex justify-between"><span>Context Window:</span> <strong>${(model.contextWindow / 1000)}K tokens</strong></p>
+                                    <p class="flex justify-between"><span>Status:</span> <strong>${model.status}</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                modal.classList.add('active');
+                document.getElementById('close-modal').addEventListener('click', () => modal.classList.remove('active'));
+            }
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+            
+            updateComparisonChart('contextWindow');
+            updateFeatureContent(Object.keys(advancedFeaturesData)[0]);
+
+        });
+    </script>
+
+</body>
+</html>
